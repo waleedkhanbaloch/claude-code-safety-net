@@ -47,6 +47,42 @@ class RmRfBlockedTests(SafetyNetTestCase):
             "rm -rf",
         )
 
+    def test_rm_rf_root_path_blocked(self) -> None:
+        self._assert_blocked(
+            "rm -rf /",
+            "root or home",
+        )
+
+    def test_rm_rf_home_path_blocked(self) -> None:
+        self._assert_blocked(
+            "rm -rf ~",
+            "root or home",
+        )
+
+    def test_rm_rf_double_dash_root_path_blocked(self) -> None:
+        self._assert_blocked(
+            "rm -rf -- /",
+            "root or home",
+        )
+
+    def test_rm_rf_tmpdir_traversal_blocked(self) -> None:
+        self._assert_blocked(
+            "rm -rf $TMPDIR/../escape",
+            "rm -rf",
+        )
+
+    def test_rm_rf_backticks_path_blocked(self) -> None:
+        self._assert_blocked(
+            "rm -rf `pwd`/escape",
+            "rm -rf",
+        )
+
+    def test_rm_rf_tilde_username_like_path_blocked(self) -> None:
+        self._assert_blocked(
+            "rm -rf ~someone/escape",
+            "rm -rf",
+        )
+
 
 class RmRfAllowedTests(SafetyNetTestCase):
     # rm -rf on temp directories
@@ -64,6 +100,18 @@ class RmRfAllowedTests(SafetyNetTestCase):
 
     def test_rm_rf_tmpdir_quoted_allowed(self) -> None:
         self._assert_allowed('rm -rf "$TMPDIR/test-dir"')
+
+    def test_rm_rf_tmpdir_root_allowed(self) -> None:
+        self._assert_allowed("rm -rf $TMPDIR")
+
+    def test_rm_rf_tmp_root_allowed(self) -> None:
+        self._assert_allowed("rm -rf /tmp")
+
+    def test_rm_r_without_force_allowed(self) -> None:
+        self._assert_allowed("rm -r /some/path")
+
+    def test_rm_f_without_recursive_allowed(self) -> None:
+        self._assert_allowed("rm -f /some/path")
 
     def test_bin_rm_rf_tmp_allowed(self) -> None:
         self._assert_allowed("/bin/rm -rf /tmp/test-dir")
@@ -102,6 +150,13 @@ class RmRfCwdAwareTests(SafetyNetTestCase):
     def test_rm_rf_dot_blocked(self) -> None:
         self._assert_blocked("rm -rf .", "rm -rf", cwd=str(self.tmpdir))
 
+    def test_rm_rf_cwd_itself_blocked(self) -> None:
+        self._assert_blocked(
+            f"rm -rf {self.tmpdir}",
+            "rm -rf",
+            cwd=str(self.tmpdir),
+        )
+
     def test_rm_rf_after_cd_bypasses_cwd_allowlist_blocked(self) -> None:
         self._assert_blocked("cd .. && rm -rf build", "rm -rf", cwd=str(self.tmpdir))
 
@@ -119,11 +174,34 @@ class RmRfCwdAwareTests(SafetyNetTestCase):
             cwd=str(self.tmpdir),
         )
 
+    def test_rm_rf_after_safe_grouped_cd_bypasses_cwd_allowlist_blocked(self) -> None:
+        self._assert_blocked(
+            "{ cd ..; echo ok; } && rm -rf build",
+            "rm -rf",
+            cwd=str(self.tmpdir),
+        )
+
     def test_rm_rf_after_command_substitution_cd_bypasses_cwd_allowlist_blocked(
         self,
     ) -> None:
         self._assert_blocked(
             "$( cd ..; rm -rf build )",
+            "rm -rf",
+            cwd=str(self.tmpdir),
+        )
+
+    def test_rm_rf_after_safe_command_substitution_cd_bypasses_cwd_allowlist_blocked(
+        self,
+    ) -> None:
+        self._assert_blocked(
+            "$( cd ..; echo ok ) && rm -rf build",
+            "rm -rf",
+            cwd=str(self.tmpdir),
+        )
+
+    def test_rm_rf_after_builtin_cd_bypasses_cwd_allowlist_blocked(self) -> None:
+        self._assert_blocked(
+            "builtin cd .. && rm -rf build",
             "rm -rf",
             cwd=str(self.tmpdir),
         )
