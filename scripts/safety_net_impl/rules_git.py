@@ -12,8 +12,7 @@ _REASON_GIT_CHECKOUT_REF_PATHSPEC = (
     "git checkout <ref> <path> overwrites working tree. Use 'git stash' first."
 )
 _REASON_GIT_CHECKOUT_PATHSPEC_FROM_FILE = (
-    "git checkout --pathspec-from-file overwrites working tree. "
-    "Use 'git stash' first."
+    "git checkout --pathspec-from-file overwrites working tree. Use 'git stash' first."
 )
 _REASON_GIT_RESTORE = (
     "git restore discards uncommitted changes. Use 'git stash' or 'git diff' first."
@@ -31,6 +30,9 @@ _REASON_GIT_CLEAN_FORCE = (
 )
 _REASON_GIT_PUSH_FORCE = (
     "Force push can destroy remote history. Use --force-with-lease if necessary."
+)
+_REASON_GIT_WORKTREE_REMOVE_FORCE = (
+    "git worktree remove --force can delete worktree files. Verify the path first."
 )
 _REASON_GIT_BRANCH_DELETE_FORCE = (
     "git branch -D force-deletes without merge check. Use -d for safety."
@@ -113,6 +115,22 @@ def _analyze_git(tokens: list[str]) -> str | None:
             return _REASON_GIT_PUSH_FORCE
         if "f" in short and has_force_with_lease:
             return _REASON_GIT_PUSH_FORCE
+        return None
+
+    if sub == "worktree":
+        if not rest_lower:
+            return None
+        if rest_lower[0] != "remove":
+            return None
+
+        rest_for_opts = rest
+        if "--" in rest_for_opts:
+            rest_for_opts = rest_for_opts[: rest_for_opts.index("--")]
+        rest_for_opts_lower = [t.lower() for t in rest_for_opts]
+        short_for_opts = _short_opts(rest_for_opts)
+        has_force = "--force" in rest_for_opts_lower or "f" in short_for_opts
+        if has_force:
+            return _REASON_GIT_WORKTREE_REMOVE_FORCE
         return None
 
     if sub == "branch":
