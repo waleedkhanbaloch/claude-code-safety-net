@@ -18,10 +18,11 @@ A Claude Code plugin that acts as a safety net, catching destructive git and fil
 - [Testing the Hook](#testing-the-hook)
 - [Development](#development)
 - [Project Structure](#project-structure)
-- [Custom Rules](#custom-rules)
+- [Custom Rules (Experimental)](#custom-rules-experimental)
   - [Config File Location](#config-file-location)
   - [Rule Schema](#rule-schema)
   - [Matching Behavior](#matching-behavior)
+    - [Known Limitations](#known-limitations)
   - [Examples](#examples)
   - [Error Handling](#error-handling)
 - [Advanced Features](#advanced-features)
@@ -185,9 +186,12 @@ tests/
   test_safety_net_rm.py
 ```
 
-## Custom Rules
+## Custom Rules (Experimental)
 
 Beyond the built-in protections, you can define your own blocking rules to enforce team conventions or project-specific safety policies.
+
+> [!TIP]
+> Use `/set-custom-rules` to create custom rules interactively with natural language.
 
 ### Quick Example
 
@@ -240,17 +244,23 @@ If no config file is found in either location, only built-in rules apply.
 | `name` | string | Yes | Unique identifier (letters, numbers, hyphens, underscores; max 64 chars) |
 | `command` | string | Yes | Base command to match (e.g., `git`, `npm`, `docker`) |
 | `subcommand` | string | No | Subcommand to match (e.g., `add`, `install`). If omitted, matches any. |
-| `block_args` | array | Yes | Arguments that trigger the block (exact match, at least one required) |
+| `block_args` | array | Yes | Arguments that trigger the block (at least one required) |
 | `reason` | string | Yes | Message shown when blocked (max 256 chars) |
 
 ### Matching Behavior
 
 - **Commands** are normalized to basename (`/usr/bin/git` → `git`)
 - **Subcommand** is the first non-option argument after the command
-- **Arguments** use exact string matching (no regex, no glob)
+- **Arguments** are matched literally (no regex, no glob), with short option expansion
 - A command is blocked if **any** argument in `block_args` is present
-- Combined short options are NOT expanded: `-Ap` does **not** match `-A`
+- **Short options** are expanded: `-Ap` matches `-A` (bundled flags are unbundled)
+- **Long options** use exact match: `--all-files` does NOT match `--all`
 - Custom rules only add restrictions—they cannot bypass built-in protections
+
+#### Known Limitations
+
+- **Short option expansion**: `-Cfoo` is treated as `-C -f -o -o`, not `-C foo`. Blocking `-f` may false-positive on attached option values.
+- **Subcommand detection**: Options that consume the next token (e.g., `git -C /path push`) may cause the option value to be detected as the subcommand, missing the real one.
 
 ### Examples
 
@@ -325,10 +335,9 @@ Custom rules use **silent fallback** error handling. If your config file is inva
 | Invalid field format | Silent — use built-in rules only |
 | Duplicate rule name | Silent — use built-in rules only |
 
-To validate your config file before use, run:
-```bash
-python -c "from scripts.safety_net_impl.config import validate_config_file; print(validate_config_file('.safety-net.json'))"
-```
+
+> [!IMPORTANT]  
+> If you add or modify custom rules manually, always validate them with the `/verify-custom-rules` slash command.
 
 ### Block Output Format
 

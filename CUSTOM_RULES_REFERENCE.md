@@ -37,8 +37,9 @@ Duplicate rule names (case-insensitive) → project wins.
 
 - **Command**: Normalized to basename (`/usr/bin/git` → `git`)
 - **Subcommand**: First non-option argument after command
-- **Arguments**: Exact string match. Command blocked if **any** `block_args` item present.
-- **Combined options**: NOT expanded (`-Ap` does not match `-A`)
+- **Arguments**: Matched literally. Command blocked if **any** `block_args` item present.
+- **Short options**: Expanded (`-Ap` matches `-A`)
+- **Long options**: Exact match (`--all-files` does NOT match `--all`)
 - **Execution order**: Built-in rules first, then custom rules (additive only)
 
 ## Examples
