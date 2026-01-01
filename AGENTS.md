@@ -88,8 +88,10 @@ def _analyze_git(tokens: list[str]) -> str | None:
 scripts/safety_net.py           # Entry point (calls hook.main())
   └── safety_net_impl/hook.py   # Main hook logic
         ├── main()              # JSON I/O, entry point
-        ├── _analyze_command()  # Splits on shell operators
-        ├── _analyze_segment()  # Tokenizes, strips wrappers, dispatches
+        ├── _analyze_command()  # Splits on shell operators, passes config
+        ├── _analyze_segment()  # Tokenizes, strips wrappers, dispatches, applies custom rules
+        ├── config.py           # Config loading (.safety-net.json)
+        ├── rules_custom.py     # Custom rule evaluation
         ├── rules_git.py        # Git subcommand analysis
         ├── rules_rm.py         # rm command analysis
         └── shell.py            # Shell parsing utilities
@@ -98,6 +100,8 @@ scripts/safety_net.py           # Entry point (calls hook.main())
 | Module | Purpose |
 |--------|---------|
 | `hook.py` | Main entry, JSON I/O, command analysis orchestration |
+| `config.py` | Config loading (`.safety-net.json`), Config dataclass |
+| `rules_custom.py` | Custom rule evaluation (`_check_custom_rules`) |
 | `rules_git.py` | Git rules (checkout, restore, reset, clean, push, branch, stash) |
 | `rules_rm.py` | rm analysis (cwd-relative, temp paths, root/home detection) |
 | `shell.py` | Shell parsing (`_split_shell_commands`, `_shlex_split`, `_strip_wrappers`) |

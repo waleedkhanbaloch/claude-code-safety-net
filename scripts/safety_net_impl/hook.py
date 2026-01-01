@@ -14,11 +14,24 @@ import re
 import sys
 from os import getenv
 
+from .config import Config, load_config
+from .rules_custom import check_custom_rules
 from .rules_git import _analyze_git
 from .rules_rm import _analyze_rm
 from .shell import _shlex_split, _short_opts, _split_shell_commands, _strip_wrappers
 
 _MAX_RECURSION_DEPTH = 5
+
+
+def _get_config(cwd: str | None = None) -> Config | None:
+    """Load config for the given cwd. Returns None if not found or invalid."""
+    return load_config(cwd)
+
+
+def _reset_config_cache() -> None:
+    """No-op, kept for backward compatibility with tests."""
+    pass
+
 
 _STRICT_SUFFIX = " [strict mode - disable with: unset SAFETY_NET_STRICT]"
 
@@ -58,12 +71,20 @@ def _strip_token_wrappers(token: str) -> str:
 
 
 def _find_has_delete(args: list[str]) -> bool:
-    """Return True if `find` args include the destructive `-delete` primary.
+    """Return True if `find` args include any dangerous action.
 
-    This is a best-effort scan that avoids common false-positives where "-delete"
-    is merely an argument (e.g. `-name -delete`) or appears inside `-exec`.
+    Detects `-delete` primary and `-exec rm -rf` patterns via _find_dangerous_action.
     """
+    return _find_dangerous_action(args) is not None
 
+
+def _find_dangerous_action(args: list[str]) -> str | None:
+    """Return a reason string if `find` args include a dangerous action.
+
+    Detects:
+    - `-delete` primary
+    - `-exec rm -rf` / `-execdir rm -rf` patterns
+    """
     # Predicates/actions that consume exactly one argument.
     consumes_one = {
         "-name",
@@ -96,13 +117,50 @@ def _find_has_delete(args: list[str]) -> bool:
         tok = _strip_token_wrappers(args[i]).lower()
 
         if tok in exec_like:
+            exec_start = i + 1
             i += 1
             while i < len(args):
                 end = _strip_token_wrappers(args[i])
                 if end in {";", "+"}:
-                    i += 1
                     break
                 i += 1
+
+            exec_tokens = args[exec_start:i]
+            if exec_tokens:
+                # Strip wrappers like env, sudo, command before checking
+                exec_tokens = _strip_wrappers(exec_tokens)
+                if not exec_tokens:
+                    i += 1
+                    continue
+
+                cmd = _normalize_cmd_token(exec_tokens[0])
+
+                # Handle busybox rm
+                if cmd == "busybox" and len(exec_tokens) >= 2:
+                    applet = _normalize_cmd_token(exec_tokens[1])
+                    if applet == "rm":
+                        exec_tokens = ["rm", *exec_tokens[2:]]
+                        cmd = "rm"
+
+                if cmd == "rm":
+                    opts: list[str] = []
+                    for t in exec_tokens[1:]:
+                        if t == "--":
+                            break
+                        opts.append(t)
+                    opts_lower = [t.lower() for t in opts]
+                    short = _short_opts(opts)
+                    recursive = (
+                        "--recursive" in opts_lower or "r" in short or "R" in short
+                    )
+                    force = "--force" in opts_lower or "f" in short
+                    if recursive and force:
+                        return (
+                            "find -exec rm -rf runs destructive deletion on matched "
+                            "files. Use find -print first to verify targets."
+                        )
+
+            i += 1
             continue
 
         if tok in consumes_one:
@@ -110,11 +168,14 @@ def _find_has_delete(args: list[str]) -> bool:
             continue
 
         if tok == "-delete":
-            return True
+            return (
+                "find -delete permanently removes files matching the criteria. "
+                "Use find -print first to verify targets."
+            )
 
         i += 1
 
-    return False
+    return None
 
 
 def _env_truthy(name: str) -> bool:
@@ -598,6 +659,7 @@ def _analyze_segment(
     strict: bool,
     paranoid_rm: bool,
     paranoid_interpreters: bool,
+    config: Config | None,
 ) -> tuple[str, str] | None:
     tokens = _shlex_split(segment)
     if tokens is None:
@@ -627,6 +689,7 @@ def _analyze_segment(
                 strict=strict,
                 paranoid_rm=paranoid_rm,
                 paranoid_interpreters=paranoid_interpreters,
+                config=config,
             )
             if analyzed:
                 return analyzed
@@ -652,6 +715,11 @@ def _analyze_segment(
     if head == "xargs":
         child = _extract_xargs_child_command(tokens)
         if child is None:
+            # No child command, but still check custom rules targeting xargs itself
+            if depth == 0 and config is not None and config.rules:
+                reason = check_custom_rules(tokens, config.rules)
+                if reason:
+                    return segment, reason
             return None
         child = _strip_wrappers(child)
         if not child:
@@ -695,6 +763,7 @@ def _analyze_segment(
                     strict=strict,
                     paranoid_rm=paranoid_rm,
                     paranoid_interpreters=paranoid_interpreters,
+                    config=config,
                 )
                 if analyzed:
                     return analyzed
@@ -715,8 +784,9 @@ def _analyze_segment(
                 )
                 return (segment, reason) if reason else None
             if applet == "find":
-                if _find_has_delete(child[2:]):
-                    return segment, _REASON_FIND_DELETE
+                reason = _find_dangerous_action(child[2:])
+                if reason:
+                    return segment, reason
 
         if child_head == "git":
             reason = _analyze_git(["git", *child[1:]])
@@ -730,8 +800,14 @@ def _analyze_segment(
             )
             return (segment, reason) if reason else None
         if child_head == "find":
-            if _find_has_delete(child[1:]):
-                return segment, _REASON_FIND_DELETE
+            reason = _find_dangerous_action(child[1:])
+            if reason:
+                return segment, reason
+
+        if depth == 0 and config is not None and config.rules:
+            reason = check_custom_rules(tokens, config.rules)
+            if reason:
+                return segment, reason
 
         return None
 
@@ -756,9 +832,15 @@ def _analyze_segment(
                         strict=strict,
                         paranoid_rm=paranoid_rm,
                         paranoid_interpreters=paranoid_interpreters,
+                        config=config,
                     )
                     if analyzed:
                         return analyzed
+            # Check custom rules targeting parallel itself
+            if depth == 0 and config is not None and config.rules:
+                reason = check_custom_rules(tokens, config.rules)
+                if reason:
+                    return segment, reason
             return None
 
         template_head = _normalize_cmd_token(template[0])
@@ -794,6 +876,7 @@ def _analyze_segment(
                                 strict=strict,
                                 paranoid_rm=paranoid_rm,
                                 paranoid_interpreters=paranoid_interpreters,
+                                config=config,
                             )
                             if analyzed:
                                 return analyzed
@@ -807,6 +890,7 @@ def _analyze_segment(
                     strict=strict,
                     paranoid_rm=paranoid_rm,
                     paranoid_interpreters=paranoid_interpreters,
+                    config=config,
                 )
                 if analyzed:
                     return analyzed
@@ -850,8 +934,9 @@ def _analyze_segment(
                         return segment, reason
                 return None
             if applet == "find":
-                if _find_has_delete(template[2:]):
-                    return segment, _REASON_FIND_DELETE
+                reason = _find_dangerous_action(template[2:])
+                if reason:
+                    return segment, reason
 
         if template_head == "git":
             reason = _analyze_git(["git", *template[1:]])
@@ -881,8 +966,14 @@ def _analyze_segment(
                     return segment, reason
             return None
         if template_head == "find":
-            if _find_has_delete(template[1:]):
-                return segment, _REASON_FIND_DELETE
+            reason = _find_dangerous_action(template[1:])
+            if reason:
+                return segment, reason
+
+        if depth == 0 and config is not None and config.rules:
+            reason = check_custom_rules(tokens, config.rules)
+            if reason:
+                return segment, reason
 
         return None
 
@@ -897,12 +988,22 @@ def _analyze_segment(
             )
             return (segment, reason) if reason else None
         if applet == "find":
-            if _find_has_delete(tokens[2:]):
-                return segment, _REASON_FIND_DELETE
+            reason = _find_dangerous_action(tokens[2:])
+            if reason:
+                return segment, reason
 
+    # For git/rm/find, use specialized analyzers and skip heuristics
     if head == "git":
         reason = _analyze_git(["git", *tokens[1:]])
-        return (segment, reason) if reason else None
+        if reason:
+            return segment, reason
+        # Check custom rules, then return (skip heuristics for git)
+        if depth == 0 and config is not None and config.rules:
+            reason = check_custom_rules(tokens, config.rules)
+            if reason:
+                return segment, reason
+        return None
+
     if head == "rm":
         reason = _analyze_rm(
             ["rm", *tokens[1:]],
@@ -910,13 +1011,27 @@ def _analyze_segment(
             cwd=cwd,
             paranoid=paranoid_rm,
         )
-        return (segment, reason) if reason else None
+        if reason:
+            return segment, reason
+        # Check custom rules, then return (skip heuristics for rm)
+        if depth == 0 and config is not None and config.rules:
+            reason = check_custom_rules(tokens, config.rules)
+            if reason:
+                return segment, reason
+        return None
 
     if head == "find":
-        if _find_has_delete(tokens[1:]):
-            return segment, _REASON_FIND_DELETE
+        reason = _find_dangerous_action(tokens[1:])
+        if reason:
+            return segment, reason
+        # Check custom rules, then return (skip heuristics for find)
+        if depth == 0 and config is not None and config.rules:
+            reason = check_custom_rules(tokens, config.rules)
+            if reason:
+                return segment, reason
+        return None
 
-    # Detect embedded destructive commands (e.g. $(rm -rf ...), `git reset --hard`).
+    # For other commands: detect embedded destructive commands, then heuristics
     for i in range(1, len(tokens)):
         cmd = _normalize_cmd_token(tokens[i])
         if cmd == "rm":
@@ -933,11 +1048,21 @@ def _analyze_segment(
             if reason:
                 return segment, reason
         if cmd == "find":
-            if _find_has_delete(tokens[i + 1 :]):
-                return segment, _REASON_FIND_DELETE
+            reason = _find_dangerous_action(tokens[i + 1 :])
+            if reason:
+                return segment, reason
 
     reason = _dangerous_in_text(segment)
-    return (segment, reason) if reason else None
+    if reason:
+        return segment, reason
+
+    # Check custom rules for other commands
+    if depth == 0 and config is not None and config.rules:
+        reason = check_custom_rules(tokens, config.rules)
+        if reason:
+            return segment, reason
+
+    return None
 
 
 def _analyze_command(
@@ -948,6 +1073,7 @@ def _analyze_command(
     strict: bool,
     paranoid_rm: bool,
     paranoid_interpreters: bool,
+    config: Config | None,
 ) -> tuple[str, str] | None:
     effective_cwd = cwd
     for segment in _split_shell_commands(command):
@@ -958,12 +1084,15 @@ def _analyze_command(
             strict=strict,
             paranoid_rm=paranoid_rm,
             paranoid_interpreters=paranoid_interpreters,
+            config=config,
         )
         if analyzed:
             return analyzed
 
         if effective_cwd is not None and _segment_changes_cwd(segment):
             effective_cwd = None
+            # Reload config without project scope (user-scope rules still apply)
+            config = load_config(cwd=None)
     return None
 
 
@@ -1118,6 +1247,8 @@ def main() -> int:
     if cwd == "":
         cwd = None
 
+    config = _get_config(cwd)
+
     analyzed = _analyze_command(
         command,
         depth=0,
@@ -1125,6 +1256,7 @@ def main() -> int:
         strict=strict,
         paranoid_rm=paranoid_rm,
         paranoid_interpreters=paranoid_interpreters,
+        config=config,
     )
     if analyzed:
         segment, reason = analyzed

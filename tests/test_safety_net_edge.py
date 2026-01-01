@@ -961,6 +961,7 @@ class EdgeCasesTests(SafetyNetTestCase):
                 strict=False,
                 paranoid_rm=False,
                 paranoid_interpreters=False,
+                config=None,
             )
         )
 

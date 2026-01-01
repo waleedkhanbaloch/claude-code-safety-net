@@ -1,11 +1,38 @@
 # Claude Code Safety Net
 
 [![CI](https://github.com/kenryu42/claude-code-safety-net/actions/workflows/ci.yml/badge.svg)](https://github.com/kenryu42/claude-code-safety-net/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/kenryu42/claude-code-plan-export)
+[![Version](https://img.shields.io/badge/version-0.3.0-blue)](https://github.com/kenryu42/claude-code-safety-net)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-Plugin-orange)](https://platform.claude.com/docs/en/agent-sdk/plugins)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A Claude Code plugin that acts as a safety net, catching destructive git and filesystem commands before they execute.
+
+## Contents
+
+- [Why This Exists](#why-this-exists)
+- [Why Hooks Instead of settings.json?](#why-hooks-instead-of-settingsjson)
+- [Quick Start](#quick-start)
+- [Commands Blocked](#commands-blocked)
+- [Commands Allowed](#commands-allowed)
+- [What Happens When Blocked](#what-happens-when-blocked)
+- [Testing the Hook](#testing-the-hook)
+- [Development](#development)
+- [Project Structure](#project-structure)
+- [Custom Rules (Experimental)](#custom-rules-experimental)
+  - [Config File Location](#config-file-location)
+  - [Rule Schema](#rule-schema)
+  - [Matching Behavior](#matching-behavior)
+    - [Known Limitations](#known-limitations)
+  - [Examples](#examples)
+  - [Error Handling](#error-handling)
+- [Advanced Features](#advanced-features)
+  - [Strict Mode](#strict-mode)
+  - [Paranoid Mode](#paranoid-mode)
+  - [Shell Wrapper Detection](#shell-wrapper-detection)
+  - [Interpreter One-Liner Detection](#interpreter-one-liner-detection)
+  - [Secret Redaction](#secret-redaction)
+  - [Audit Logging](#audit-logging)
+- [License](#license)
 
 ## Why This Exists
 
@@ -143,7 +170,9 @@ scripts/
   safety_net.py          # Entry point
   safety_net_impl/
     __init__.py
+    config.py            # Config loading and validation
     hook.py              # Main hook logic
+    rules_custom.py      # Custom rule matching
     rules_git.py         # Git command rules
     rules_rm.py          # rm command rules
     shell.py             # Shell parsing utilities
@@ -155,6 +184,171 @@ tests/
   test_safety_net_git.py
   test_safety_net_parsing_helpers.py
   test_safety_net_rm.py
+```
+
+## Custom Rules (Experimental)
+
+Beyond the built-in protections, you can define your own blocking rules to enforce team conventions or project-specific safety policies.
+
+> [!TIP]
+> Use `/set-custom-rules` to create custom rules interactively with natural language.
+
+### Quick Example
+
+Create `.safety-net.json` in your project root:
+
+```json
+{
+  "version": 1,
+  "rules": [
+    {
+      "name": "block-git-add-all",
+      "command": "git",
+      "subcommand": "add",
+      "block_args": ["-A", "--all", "."],
+      "reason": "Use 'git add <specific-files>' instead of blanket add."
+    }
+  ]
+}
+```
+
+Now `git add -A`, `git add --all`, and `git add .` will be blocked with your custom message.
+
+### Config File Location
+
+Config files are loaded from two scopes and merged:
+
+1. **User scope**: `~/.cc-safety-net/config.json` (always loaded if exists)
+2. **Project scope**: `.safety-net.json` in the current working directory (loaded if exists)
+
+**Merging behavior**:
+- Rules from both scopes are combined
+- If the same rule name exists in both scopes, **project scope wins**
+- Rule name comparison is case-insensitive (`MyRule` and `myrule` are considered duplicates)
+
+This allows you to define personal defaults in user scope while letting projects override specific rules.
+
+If no config file is found in either location, only built-in rules apply.
+
+### Config Schema
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `version` | integer | Yes | Schema version (must be `1`) |
+| `rules` | array | No | List of custom blocking rules (defaults to empty) |
+
+### Rule Schema
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Unique identifier (letters, numbers, hyphens, underscores; max 64 chars) |
+| `command` | string | Yes | Base command to match (e.g., `git`, `npm`, `docker`) |
+| `subcommand` | string | No | Subcommand to match (e.g., `add`, `install`). If omitted, matches any. |
+| `block_args` | array | Yes | Arguments that trigger the block (at least one required) |
+| `reason` | string | Yes | Message shown when blocked (max 256 chars) |
+
+### Matching Behavior
+
+- **Commands** are normalized to basename (`/usr/bin/git` → `git`)
+- **Subcommand** is the first non-option argument after the command
+- **Arguments** are matched literally (no regex, no glob), with short option expansion
+- A command is blocked if **any** argument in `block_args` is present
+- **Short options** are expanded: `-Ap` matches `-A` (bundled flags are unbundled)
+- **Long options** use exact match: `--all-files` does NOT match `--all`
+- Custom rules only add restrictions—they cannot bypass built-in protections
+
+#### Known Limitations
+
+- **Short option expansion**: `-Cfoo` is treated as `-C -f -o -o`, not `-C foo`. Blocking `-f` may false-positive on attached option values.
+- **Subcommand detection**: Options that consume the next token (e.g., `git -C /path push`) may cause the option value to be detected as the subcommand, missing the real one.
+
+### Examples
+
+#### Block global npm installs
+
+```json
+{
+  "version": 1,
+  "rules": [
+    {
+      "name": "block-npm-global",
+      "command": "npm",
+      "subcommand": "install",
+      "block_args": ["-g", "--global"],
+      "reason": "Global npm installs can cause version conflicts. Use npx or local install."
+    }
+  ]
+}
+```
+
+#### Block dangerous docker commands
+
+```json
+{
+  "version": 1,
+  "rules": [
+    {
+      "name": "block-docker-system-prune",
+      "command": "docker",
+      "subcommand": "system",
+      "block_args": ["prune"],
+      "reason": "docker system prune removes all unused data. Use targeted cleanup instead."
+    }
+  ]
+}
+```
+
+#### Multiple rules
+
+```json
+{
+  "version": 1,
+  "rules": [
+    {
+      "name": "block-git-add-all",
+      "command": "git",
+      "subcommand": "add",
+      "block_args": ["-A", "--all", ".", "-u", "--update"],
+      "reason": "Use 'git add <specific-files>' instead of blanket add."
+    },
+    {
+      "name": "block-npm-global",
+      "command": "npm",
+      "subcommand": "install",
+      "block_args": ["-g", "--global"],
+      "reason": "Use npx or local install instead of global."
+    }
+  ]
+}
+```
+
+### Error Handling
+
+Custom rules use **silent fallback** error handling. If your config file is invalid, the safety net silently falls back to built-in rules only:
+
+| Scenario | Behavior |
+|----------|----------|
+| Config file not found | Silent — use built-in rules only |
+| Empty config file | Silent — use built-in rules only |
+| Invalid JSON syntax | Silent — use built-in rules only |
+| Missing required field | Silent — use built-in rules only |
+| Invalid field format | Silent — use built-in rules only |
+| Duplicate rule name | Silent — use built-in rules only |
+
+
+> [!IMPORTANT]  
+> If you add or modify custom rules manually, always validate them with the `/verify-custom-rules` slash command.
+
+### Block Output Format
+
+When a custom rule blocks a command, the output includes the rule name:
+
+```text
+BLOCKED by Safety Net
+
+Reason: [block-git-add-all] Use 'git add <specific-files>' instead of blanket add.
+
+Command: git add -A
 ```
 
 ## Advanced Features

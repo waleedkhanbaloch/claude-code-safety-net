@@ -5,12 +5,23 @@ import json
 from unittest import mock
 
 from scripts import safety_net
+from scripts.safety_net_impl.hook import _reset_config_cache
 
 from . import TempDirTestCase
 
 
 class SafetyNetTestCase(TempDirTestCase):
     """Base test case with helpers for running the safety-net guard."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        # Reset config cache before each test to ensure clean state
+        _reset_config_cache()
+
+    def tearDown(self) -> None:
+        # Reset config cache after each test
+        _reset_config_cache()
+        super().tearDown()
 
     def _run_guard(self, command: str, *, cwd: str | None = None) -> dict | None:
         """Run the guard with a Bash command and return parsed output or None."""

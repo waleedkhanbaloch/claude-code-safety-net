@@ -39,3 +39,83 @@ class FindDeleteTests(SafetyNetTestCase):
             'python -c "import os; os.system(\\"find . -delete\\")"',
             "find -delete",
         )
+
+
+class FindExecRmTests(SafetyNetTestCase):
+    def test_find_exec_rm_rf_blocked(self) -> None:
+        self._assert_blocked(
+            "find . -exec rm -rf {} \\;",
+            "find -exec rm -rf",
+        )
+
+    def test_find_execdir_rm_rf_blocked(self) -> None:
+        self._assert_blocked(
+            "find /tmp -execdir rm -rf {} +",
+            "find -exec rm -rf",
+        )
+
+    def test_find_exec_rm_r_force_blocked(self) -> None:
+        self._assert_blocked(
+            "find . -name '*.tmp' -exec rm -r --force {} \\;",
+            "find -exec rm -rf",
+        )
+
+    def test_find_exec_rm_recursive_blocked(self) -> None:
+        self._assert_blocked(
+            "find . -exec rm --recursive -f {} \\;",
+            "find -exec rm -rf",
+        )
+
+    def test_find_exec_rm_no_force_allowed(self) -> None:
+        self._assert_allowed("find . -exec rm -r {} \\;")
+
+    def test_find_exec_rm_no_recursive_allowed(self) -> None:
+        self._assert_allowed("find . -exec rm -f {} \\;")
+
+    def test_find_exec_echo_allowed(self) -> None:
+        self._assert_allowed("find . -exec echo {} \\;")
+
+    def test_find_exec_cat_allowed(self) -> None:
+        self._assert_allowed("find . -type f -exec cat {} +")
+
+    def test_busybox_find_exec_rm_rf_blocked(self) -> None:
+        self._assert_blocked(
+            "busybox find . -exec rm -rf {} \\;",
+            "find -exec rm -rf",
+        )
+
+    def test_find_exec_rm_rf_in_bash_c_blocked(self) -> None:
+        self._assert_blocked(
+            "bash -c 'find . -exec rm -rf {} \\;'",
+            "find -exec rm -rf",
+        )
+
+    def test_find_exec_env_rm_rf_blocked(self) -> None:
+        self._assert_blocked(
+            "find . -exec env rm -rf {} ;",
+            "find -exec rm -rf",
+        )
+
+    def test_find_exec_sudo_rm_rf_blocked(self) -> None:
+        self._assert_blocked(
+            "find . -exec sudo rm -rf {} ;",
+            "find -exec rm -rf",
+        )
+
+    def test_find_exec_command_rm_rf_blocked(self) -> None:
+        self._assert_blocked(
+            "find . -exec command rm -rf {} ;",
+            "find -exec rm -rf",
+        )
+
+    def test_find_exec_busybox_rm_rf_blocked(self) -> None:
+        self._assert_blocked(
+            "find . -exec busybox rm -rf {} ;",
+            "find -exec rm -rf",
+        )
+
+    def test_find_execdir_env_rm_rf_blocked(self) -> None:
+        self._assert_blocked(
+            "find /tmp -execdir env rm -rf {} +",
+            "find -exec rm -rf",
+        )
