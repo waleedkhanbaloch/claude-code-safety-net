@@ -158,3 +158,19 @@ class AuditLogTests(AuditLogTestCase):
         entries = self._read_log_entries(session_id)
         self.assertEqual(len(entries), 1)
         self.assertIsNone(entries[0]["cwd"])
+
+    def test_invalid_config_uses_builtin_only_no_log(self) -> None:
+        session_id = "test-session-config-error"
+        config_dir = self.tmpdir / "project"
+        config_dir.mkdir()
+        config_file = config_dir / ".safety-net.json"
+        config_file.write_text('{"version": 999}', encoding="utf-8")
+
+        self._run_guard_with_session(
+            "echo hello",
+            session_id=session_id,
+            cwd=str(config_dir),
+        )
+
+        entries = self._read_log_entries(session_id)
+        self.assertEqual(len(entries), 0)
