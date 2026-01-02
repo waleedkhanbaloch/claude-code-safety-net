@@ -1,11 +1,15 @@
 ---
 description: Verify custom rules for the project
-allowed-tools: Bash
+allowed-tools: Bash, AskUserQuestion
 ---
 
 **Reference**: @CUSTOM_RULES_REFERENCE.md for schema details, field constraints, and examples.
 
-Verify the custom rules config file using the verify_config.py script.
+You are helping the user verify the custom rules config file.
+ALWAYS use AskUserQuestion tool when you need to ask the user questions.
+
+### Verification Script
+
 ```bash
 python3 --version >/dev/null 2>&1 && python3 "${CLAUDE_PLUGIN_ROOT}/scripts/verify_config.py" || python "${CLAUDE_PLUGIN_ROOT}/scripts/verify_config.py"
 ```

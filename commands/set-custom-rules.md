@@ -1,11 +1,12 @@
 ---
 description: Set custom rules for the project
-allowed-tools: Bash, Read, Write, Glob
+allowed-tools: Bash, Read, Write, Glob, AskUserQuestion
 ---
 
 # Set Custom Rules for Safety Net
 
 You are helping the user configure custom blocking rules for claude-code-safety-net.
+ALWAYS use AskUserQuestion tool when you need to ask the user questions.
 
 **Reference**: @CUSTOM_RULES_REFERENCE.md for schema details, field constraints, and examples.
 
