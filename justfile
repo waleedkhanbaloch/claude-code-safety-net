@@ -21,5 +21,7 @@ bump:
     uv sync
     git add uv.lock
     git commit --amend --no-edit --no-verify
+    @# Move tag to amended commit (cz bump tagged the pre-amend commit)
+    git tag -f $(git describe --tags --abbrev=0)
     git push -u origin HEAD --follow-tags
     gh release create $(git describe --tags --abbrev=0) --notes "$(uv run cz changelog $(git describe --tags --abbrev=0) --dry-run)"
