@@ -17,7 +17,6 @@ A Claude Code plugin that acts as a safety net, catching destructive git and fil
 - [What Happens When Blocked](#what-happens-when-blocked)
 - [Testing the Hook](#testing-the-hook)
 - [Development](#development)
-- [Project Structure](#project-structure)
 - [Custom Rules (Experimental)](#custom-rules-experimental)
   - [Config File Location](#config-file-location)
   - [Rule Schema](#rule-schema)
@@ -138,53 +137,7 @@ git checkout -b test-branch
 
 ## Development
 
-### Setup
-
-```bash
-just setup
-# or
-uv sync && uv run pre-commit install
-```
-
-### Run Tests
-
-```bash
-uv run pytest
-```
-
-### Full Checks
-
-```bash
-just check
-```
-
-## Project Structure
-
-```text
-.claude-plugin/
-  plugin.json
-  marketplace.json
-hooks/
-  hooks.json
-scripts/
-  safety_net.py          # Entry point
-  safety_net_impl/
-    __init__.py
-    config.py            # Config loading and validation
-    hook.py              # Main hook logic
-    rules_custom.py      # Custom rule matching
-    rules_git.py         # Git command rules
-    rules_rm.py          # rm command rules
-    shell.py             # Shell parsing utilities
-tests/
-  safety_net_test_base.py
-  test_safety_net_audit.py
-  test_safety_net_edge.py
-  test_safety_net_find.py
-  test_safety_net_git.py
-  test_safety_net_parsing_helpers.py
-  test_safety_net_rm.py
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute to this project.
 
 ## Custom Rules (Experimental)
 
