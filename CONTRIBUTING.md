@@ -29,10 +29,8 @@ Be respectful, inclusive, and constructive. We're all here to make better tools 
 
 ### Prerequisites
 
-- **Python 3.10+** - Required for type hints and modern syntax
-- **uv** - The only supported package manager ([install guide](https://docs.astral.sh/uv/getting-started/installation/))
-- **just** (optional) - Command runner for convenience ([install guide](https://just.systems/man/en/packages.html))
-- **Claude Code** - For testing the plugin
+- **Bun** - Required runtime and package manager ([install guide](https://bun.sh/docs/installation))
+- **Claude Code** or **OpenCode** - For testing the plugin
 
 ### Development Setup
 
@@ -41,10 +39,8 @@ Be respectful, inclusive, and constructive. We're all here to make better tools 
 git clone https://github.com/kenryu42/claude-code-safety-net.git
 cd claude-code-safety-net
 
-# Install dependencies and pre-commit hooks
-just setup
-# or
-uv sync && uv run pre-commit install
+# Install dependencies
+bun install
 ```
 
 ### Testing Your Changes Locally
@@ -62,7 +58,7 @@ After making changes, you can test your local build in Claude Code:
    ```bash
    # This should be blocked
    git checkout -- README.md
-   
+
    # This should be allowed
    git checkout -b test-branch
    ```
@@ -79,139 +75,152 @@ claude-code-safety-net/
 │   └── marketplace.json    # Marketplace config
 ├── hooks/
 │   └── hooks.json          # Hook definitions
-├── scripts/
-│   ├── safety_net.py       # Entry point (calls hook.main())
-│   └── safety_net_impl/
-│       ├── __init__.py
-│       ├── hook.py         # Main hook logic, JSON I/O
-│       ├── rules_git.py    # Git subcommand analysis
-│       ├── rules_rm.py     # rm command analysis
-│       └── shell.py        # Shell parsing utilities
+├── src/
+│   ├── index.ts            # OpenCode plugin export
+│   ├── types.ts            # Shared type definitions
+│   ├── bin/
+│   │   └── cc-safety-net.ts  # Claude Code CLI entry point
+│   └── core/
+│       ├── analyze.ts      # Main analysis logic
+│       ├── audit.ts        # Audit logging
+│       ├── config.ts       # Config loading
+│       ├── rules-git.ts    # Git subcommand analysis
+│       ├── rules-rm.ts     # rm command analysis
+│       ├── rules-custom.ts # Custom rule evaluation
+│       ├── shell.ts        # Shell parsing utilities
+│       └── verify-config.ts # Config validator
 ├── tests/
-│   ├── __init__.py
-│   ├── safety_net_test_base.py  # Test base class
-│   ├── test_safety_net_git.py   # Git rule tests
-│   ├── test_safety_net_rm.py    # rm rule tests
-│   └── ...                      # Other test files
-├── justfile                # Command runner recipes
-├── pyproject.toml          # Project config
-└── .pre-commit-config.yaml # Pre-commit hooks
+│   ├── helpers.ts          # Test utilities
+│   ├── rules-git.test.ts   # Git rule tests
+│   ├── rules-rm.test.ts    # rm rule tests
+│   └── ...                 # Other test files
+├── package.json            # Project config
+├── tsconfig.json           # TypeScript config
+└── biome.json              # Linter/formatter config
 ```
 
 | Module | Purpose |
 |--------|---------|
-| `hook.py` | Main entry, JSON I/O, command analysis orchestration |
-| `rules_git.py` | Git rules (checkout, restore, reset, clean, push, branch, stash) |
-| `rules_rm.py` | rm analysis (cwd-relative, temp paths, root/home detection) |
-| `shell.py` | Shell parsing (`_split_shell_commands`, `_shlex_split`, `_strip_wrappers`) |
+| `analyze.ts` | Main entry, command analysis orchestration |
+| `rules-git.ts` | Git rules (checkout, restore, reset, clean, push, branch, stash) |
+| `rules-rm.ts` | rm analysis (cwd-relative, temp paths, root/home detection) |
+| `rules-custom.ts` | Custom rule matching |
+| `shell.ts` | Shell parsing (`splitShellCommands`, `shlexSplit`, `stripWrappers`) |
 
 ## Development Workflow
 
 ### Build Commands
 
 ```bash
-# Run all checks (lint, type check, dead code, tests)
-just check
+# Run all checks (lint, type check, dead code, ast-grep scan, tests)
+bun run check
 
 # Individual commands
-uv run ruff check          # Lint only
-uv run ruff check --fix    # Lint + auto-fix
-uv run ruff format         # Format code
-uv run mypy .              # Type check
-uv run vulture             # Dead code detection
-uv run pytest              # Run tests
+bun run lint          # Lint + format (Biome)
+bun run typecheck     # Type check
+bun run knip          # Dead code detection
+bun run sg:scan       # AST pattern scan
+bun test              # Run tests
 
 # Run specific test
-uv run pytest tests/test_safety_net_git.py::TestGitCheckout::test_checkout_double_dash -v
+bun test tests/rules-git.test.ts
 
 # Run tests matching pattern
-uv run pytest -k "checkout" -v
+bun test --grep "checkout"
+
+# Build for distribution
+bun run build
 ```
 
 ### Code Style & Conventions
 
 | Convention | Rule |
 |------------|------|
-| Python Version | **3.10+** |
-| Package Manager | **uv only** (`uv run`, `uv sync`) |
-| Line Length | 88 characters |
-| Formatter | Ruff |
+| Runtime | **Bun** |
+| Package Manager | **bun only** (`bun install`, `bun run`) |
+| Formatter/Linter | **Biome** |
 | Type Hints | Required on all functions |
-| Type Syntax | `X \| None` not `Optional[X]`, `list[str]` not `List[str]` |
-| Naming | `snake_case` for functions, `PascalCase` for classes, `_REASON_*` for block reasons |
-| Imports | stdlib → third-party → local, relative imports within package |
-| Docstrings | Required for modules and non-trivial functions |
-| Test Coverage | **Minimum 90%** - CI will fail if coverage drops below this |
+| Type Syntax | `type \| null` preferred over `type \| undefined` |
+| File Naming | `kebab-case` (e.g., `rules-git.ts`, not `rulesGit.ts`) |
+| Function Naming | `camelCase` for functions, `PascalCase` for types/interfaces |
+| Constants | `SCREAMING_SNAKE_CASE` for reason constants |
+| Imports | Relative imports within package |
 
 **Examples**:
 
-```python
-# Good
-def analyze(command: str, *, strict: bool = False) -> str | None:
-    """Analyze command and return block reason if dangerous."""
-    ...
+```typescript
+// Good
+export function analyzeCommand(
+  command: string,
+  options?: { strict?: boolean }
+): string | null {
+  // ...
+}
 
-# Bad
-def analyze(command, strict=False):  # Missing type hints
-    ...
-def analyze(command: str) -> Optional[str]:  # Old syntax
-    ...
+// Bad
+export function analyzeCommand(command, options) {  // Missing type hints
+  // ...
+}
 ```
 
 **Anti-Patterns (Do Not Do)**:
-- Using pip/poetry instead of uv
-- Suppressing type errors with `# type: ignore` or `Any`
+- Using npm/yarn/pnpm instead of bun
+- Suppressing type errors with `@ts-ignore` or `any`
 - Skipping tests for new rules
-- Modifying version in `pyproject.toml` directly
+- Modifying version in `package.json` directly
 
 ## Making Changes
 
 ### Adding a Git Rule
 
-1. **Add reason constant** in `scripts/safety_net_impl/rules_git.py`:
-   ```python
-   _REASON_MY_RULE = "git my-command does something dangerous. Use safer alternative."
+1. **Add reason constant** in `src/core/rules-git.ts`:
+   ```typescript
+   const REASON_MY_RULE = "git my-command does something dangerous. Use safer alternative.";
    ```
 
-2. **Add detection logic** in `_analyze_git()`:
-   ```python
-   if subcommand == "my-command" and "--dangerous-flag" in tokens:
-       return _REASON_MY_RULE
+2. **Add detection logic** in `analyzeGit()`:
+   ```typescript
+   if (subcommand === "my-command" && tokens.includes("--dangerous-flag")) {
+     return REASON_MY_RULE;
+   }
    ```
 
-3. **Add tests** in `tests/test_safety_net_git.py`:
-   ```python
-   class TestGitMyCommand(SafetyNetTestCase):
-       def test_dangerous_blocked(self) -> None:
-           self._assert_blocked("git my-command --dangerous-flag", "dangerous")
-   
-       def test_safe_allowed(self) -> None:
-           self._assert_allowed("git my-command --safe-flag")
+3. **Add tests** in `tests/rules-git.test.ts`:
+   ```typescript
+   describe("git my-command", () => {
+     test("dangerous flag blocked", () => {
+       assertBlocked("git my-command --dangerous-flag", "dangerous");
+     });
+
+     test("safe flag allowed", () => {
+       assertAllowed("git my-command --safe-flag");
+     });
+   });
    ```
 
 4. **Run checks**:
    ```bash
-   just check
+   bun run check
    ```
 
 ### Adding an rm Rule
 
-1. **Add logic** in `scripts/safety_net_impl/rules_rm.py`
-2. **Add tests** in `tests/test_safety_net_rm.py`
-3. **Run checks**: `just check`
+1. **Add logic** in `src/core/rules-rm.ts`
+2. **Add tests** in `tests/rules-rm.test.ts`
+3. **Run checks**: `bun run check`
 
 ### Adding Other Command Rules
 
-1. **Add reason constant** in `scripts/safety_net_impl/hook.py`:
-   ```python
-   _REASON_MY_COMMAND = "my-command is dangerous because..."
+1. **Add reason constant** in `src/core/analyze.ts`:
+   ```typescript
+   const REASON_MY_COMMAND = "my-command is dangerous because...";
    ```
 
-2. **Add detection** in `_analyze_segment()`
+2. **Add detection** in `analyzeSegment()`
 
 3. **Add tests** in the appropriate test file
 
-4. **Run checks**: `just check`
+4. **Run checks**: `bun run check`
 
 ### Edge Cases to Test
 
@@ -230,7 +239,7 @@ When adding rules, ensure you test these edge cases:
 2. **Make changes** following the conventions above
 3. **Run all checks** locally:
    ```bash
-   just check  # Must pass with no errors
+   bun run check  # Must pass with no errors
    ```
 4. **Test in Claude Code** using the local plugin method described above
 5. **Commit** with clear, descriptive messages:
@@ -242,25 +251,24 @@ When adding rules, ensure you test these edge cases:
 ### PR Checklist
 
 - [ ] Code follows project conventions (type hints, naming, etc.)
-- [ ] `just check` passes (lint, types, dead code, tests)
-- [ ] Tests added for new rules (minimum 90% coverage required)
-- [ ] Tested locally with Claude Code
+- [ ] `bun run check` passes (lint, types, dead code, tests)
+- [ ] Tests added for new rules
+- [ ] Tested locally with Claude Code and Opencode
 - [ ] Updated documentation if needed (README, AGENTS.md)
-- [ ] No version changes in `pyproject.toml`
+- [ ] No version changes in `package.json`
 
 ## Publishing
 
 **Important**: Version bumping and releases are handled by maintainers only.
 
-- **Never** modify the version in `pyproject.toml` directly
-- **Never** run `just bump` - this is for maintainers only
-- Maintainers use `just bump` to version, tag, and release
+- **Never** modify the version in `package.json` directly
+- Maintainers handle versioning, tagging, and releases
 
 ## Getting Help
 
 - **Project Knowledge**: Check `CLAUDE.md` or `AGENTS.md` for detailed architecture and conventions
-- **Code Patterns**: Review existing implementations in `scripts/safety_net_impl/`
-- **Test Patterns**: See `tests/safety_net_test_base.py` for test helpers
+- **Code Patterns**: Review existing implementations in `src/core/`
+- **Test Patterns**: See `tests/helpers.ts` for test utilities
 - **Issues**: Open an issue for bugs or feature requests
 
 ---
