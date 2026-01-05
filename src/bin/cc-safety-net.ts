@@ -95,7 +95,7 @@ async function runClaudeCodeHook(): Promise<void> {
 		return;
 	}
 
-	const cwd = input.tool_input?.workdir ?? process.cwd();
+	const cwd = input.cwd ?? process.cwd();
 	const strict = envTruthy("SAFETY_NET_STRICT");
 	const paranoidAll = envTruthy("SAFETY_NET_PARANOID");
 	const paranoidRm = paranoidAll || envTruthy("SAFETY_NET_PARANOID_RM");
