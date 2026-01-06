@@ -3,7 +3,7 @@
 import { $ } from "bun";
 
 const EXCLUDED_AUTHORS = ["actions-user", "github-actions[bot]", "kenryu42"];
-const REPO = "kenryu42/claude-code-safety-net";
+const REPO = process.env.GITHUB_REPOSITORY ?? "kenryu42/claude-code-safety-net";
 
 async function getLatestReleasedTag(): Promise<string | null> {
 	try {
