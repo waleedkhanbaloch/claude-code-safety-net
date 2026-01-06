@@ -11,7 +11,7 @@ ALWAYS use AskUserQuestion tool when you need to ask the user questions.
 ### Verification Script
 
 ```bash
-bun run "${CLAUDE_PLUGIN_ROOT}/src/bin/cc-safety-net.ts --verify-config"
+npx -y cc-safety-net --verify-config
 ```
 
 If the config has validation errors, inform the user:

@@ -69,7 +69,7 @@ mkdir -p ~/.cc-safety-net
 
 Write config, then validate:
 ```bash
-bun run "${CLAUDE_PLUGIN_ROOT}/src/bin/cc-safety-net.ts --verify-config"
+npx -y cc-safety-net --verify-config
 ```
 
 If validation errors:
