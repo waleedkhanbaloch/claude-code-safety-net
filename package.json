@@ -18,7 +18,7 @@
 		"clean": "rm -rf dist",
 		"check": "bun run lint && bun run typecheck && bun run knip && bun run sg:scan && AGENT=1 bun test",
 		"lint": "biome check --write",
-		"typecheck": "tsc",
+		"typecheck": "tsc --project tsconfig.typecheck.json",
 		"knip": "knip --production",
 		"sg:scan": "ast-grep scan",
 		"prepare": "husky && bun run setup-hooks",
