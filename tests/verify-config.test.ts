@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -284,6 +290,82 @@ describe("verify-config", () => {
 			const stderr = getStderr();
 			expect(stderr).toContain("✗ User config:");
 			expect(stdout).toContain("✓ Project config:");
+		});
+	});
+
+	describe("schema auto-add", () => {
+		function readProjectConfig(): Record<string, unknown> {
+			return JSON.parse(readFileSync(projectConfigPath, "utf-8"));
+		}
+
+		function readUserConfig(): Record<string, unknown> {
+			return JSON.parse(readFileSync(userConfigPath, "utf-8"));
+		}
+
+		test("adds $schema to valid project config missing it", () => {
+			writeProjectConfig('{"version": 1}');
+			runMain();
+			const config = readProjectConfig();
+			expect(config.$schema).toBe(
+				"https://raw.githubusercontent.com/kenryu42/claude-code-safety-net/main/assets/cc-safety-net.schema.json",
+			);
+		});
+
+		test("adds $schema to valid user config missing it", () => {
+			writeUserConfig('{"version": 1}');
+			runMain();
+			const config = readUserConfig();
+			expect(config.$schema).toBe(
+				"https://raw.githubusercontent.com/kenryu42/claude-code-safety-net/main/assets/cc-safety-net.schema.json",
+			);
+		});
+
+		test("does not modify config that already has $schema", () => {
+			const originalConfig = {
+				$schema:
+					"https://raw.githubusercontent.com/kenryu42/claude-code-safety-net/main/assets/cc-safety-net.schema.json",
+				version: 1,
+			};
+			writeProjectConfig(JSON.stringify(originalConfig, null, 2));
+			runMain();
+			const config = readProjectConfig();
+			expect(config).toEqual(originalConfig);
+		});
+
+		test("preserves existing rules when adding $schema", () => {
+			const originalConfig = {
+				version: 1,
+				rules: [
+					{
+						name: "block-foo",
+						command: "foo",
+						block_args: ["-x"],
+						reason: "Blocked",
+					},
+				],
+			};
+			writeProjectConfig(JSON.stringify(originalConfig));
+			runMain();
+			const config = readProjectConfig();
+			expect(config.$schema).toBe(
+				"https://raw.githubusercontent.com/kenryu42/claude-code-safety-net/main/assets/cc-safety-net.schema.json",
+			);
+			expect(config.version).toBe(1);
+			expect(config.rules).toEqual(originalConfig.rules);
+		});
+
+		test("does not add $schema to invalid config", () => {
+			writeProjectConfig('{"version": 2}');
+			runMain();
+			const config = readProjectConfig();
+			expect(config.$schema).toBeUndefined();
+		});
+
+		test("prints message when $schema is added", () => {
+			writeProjectConfig('{"version": 1}');
+			runMain();
+			const output = getStdout();
+			expect(output).toContain("Added $schema");
 		});
 	});
 });

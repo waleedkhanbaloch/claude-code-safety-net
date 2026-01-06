@@ -2,7 +2,7 @@
  * Verify user and project scope config files for safety-net.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
 	getProjectConfigPath,
@@ -18,6 +18,8 @@ export interface VerifyConfigOptions {
 
 const HEADER = "Safety Net Config";
 const SEPARATOR = "═".repeat(HEADER.length);
+const SCHEMA_URL =
+	"https://raw.githubusercontent.com/kenryu42/claude-code-safety-net/main/assets/cc-safety-net.schema.json";
 
 function printHeader(): void {
 	console.log(HEADER);
@@ -55,6 +57,23 @@ function printInvalidConfig(
 			console.error(`    ${errorNum}. ${part}`);
 			errorNum++;
 		}
+	}
+}
+
+function addSchemaIfMissing(path: string): boolean {
+	try {
+		const content = readFileSync(path, "utf-8");
+		const parsed = JSON.parse(content) as Record<string, unknown>;
+
+		if (parsed.$schema) {
+			return false;
+		}
+
+		const updated = { $schema: SCHEMA_URL, ...parsed };
+		writeFileSync(path, JSON.stringify(updated, null, 2), "utf-8");
+		return true;
+	} catch {
+		return false;
 	}
 }
 
@@ -104,6 +123,9 @@ export function verifyConfig(options: VerifyConfigOptions = {}): number {
 		if (result.errors.length > 0) {
 			printInvalidConfig(scope, path, result.errors);
 		} else {
+			if (addSchemaIfMissing(path)) {
+				console.log(`\nAdded $schema to ${scope.toLowerCase()} config.`);
+			}
 			printValidConfig(scope, path, result);
 		}
 	}
