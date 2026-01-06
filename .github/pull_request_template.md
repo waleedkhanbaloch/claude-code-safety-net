@@ -23,7 +23,7 @@
 <!-- How to verify this PR works correctly. Delete if not applicable. -->
 
 ```bash
-just check
+bun run check
 ```
 
 ## Related Issues
