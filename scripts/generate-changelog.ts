@@ -7,8 +7,24 @@ export const EXCLUDED_AUTHORS = [
 	"github-actions[bot]",
 	"kenryu42",
 ];
+
+/** Commit prefixes to include in changelog */
+export const INCLUDED_PREFIXES = ["feat:", "fix:"];
+
 export const REPO =
 	process.env.GITHUB_REPOSITORY ?? "kenryu42/claude-code-safety-net";
+
+/**
+ * Check if a commit message should be included in the changelog.
+ * @param message - The commit message (can include hash prefix like "abc1234 feat: message")
+ */
+export function isIncludedCommit(message: string): boolean {
+	// Remove optional hash prefix (e.g., "abc1234 " from git log output)
+	const messageWithoutHash = message.replace(/^\w+\s+/, "");
+	const lowerMessage = messageWithoutHash.toLowerCase();
+
+	return INCLUDED_PREFIXES.some((prefix) => lowerMessage.startsWith(prefix));
+}
 
 export async function getLatestReleasedTag(): Promise<string | null> {
 	try {
@@ -30,10 +46,7 @@ export async function generateChangelog(
 			await $`git log ${previousTag}..HEAD --oneline --format="%h %s"`.text();
 		const commits = log
 			.split("\n")
-			.filter(
-				(line) =>
-					line && !line.match(/^\w+ (ignore:|test:|chore:|ci:|release:)/i),
-			);
+			.filter((line) => line && isIncludedCommit(line));
 
 		for (const commit of commits) {
 			notes.push(`- ${commit}`);
@@ -59,7 +72,7 @@ export async function getContributors(previousTag: string): Promise<string[]> {
 				message: string;
 			};
 			const title = message.split("\n")[0] ?? "";
-			if (title.match(/^(ignore:|test:|chore:|ci:|release:)/i)) continue;
+			if (!isIncludedCommit(title)) continue;
 
 			if (login && !EXCLUDED_AUTHORS.includes(login)) {
 				if (!contributors.has(login)) contributors.set(login, []);
