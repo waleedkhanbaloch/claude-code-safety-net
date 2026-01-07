@@ -21,6 +21,7 @@
 		"typecheck": "tsc --project tsconfig.typecheck.json",
 		"knip": "knip --production",
 		"sg:scan": "ast-grep scan",
+		"test": "bun test",
 		"prepare": "husky && bun run setup-hooks",
 		"setup-hooks": "bun -e 'await Bun.write(\".husky/pre-commit\", \"#!/usr/bin/env sh\\n\\nbun run knip && bun run lint-staged\\n\")' && chmod +x .husky/pre-commit"
 	},
