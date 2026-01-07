@@ -85,17 +85,23 @@ Paste this into any LLM agent (Claude Code, OpenCode, Cursor, etc.):
 
 ```
 Install the cc-safety-net plugin in `~/.config/opencode/opencode.json` (or `.jsonc`) according to the schema at: https://opencode.ai/config.json
+
+Then copy the following files to `~/.config/opencode/command/`:
+- https://raw.githubusercontent.com/kenryu42/claude-code-safety-net/main/commands/set-custom-rules.md
+- https://raw.githubusercontent.com/kenryu42/claude-code-safety-net/main/commands/verify-custom-rules.md
 ```
 
 **Option B: Manual setup**
 
-**Add the plugin to your config** `~/.config/opencode/opencode.json` (or `.jsonc`):
+1. **Add the plugin to your config** `~/.config/opencode/opencode.json` (or `.jsonc`):
 
-```json
-{
-  "plugin": ["cc-safety-net"]
-}
-```
+  ```json
+  {
+    "plugin": ["cc-safety-net"]
+  }
+  ```
+
+2. **Copy the [commands](commands) to `~/.config/opencode/command/`**
 
 ## Commands Blocked
 
