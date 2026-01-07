@@ -124,8 +124,8 @@ describe("git rules", () => {
 |----------|---------|
 | `assertBlocked(command, reasonContains, cwd?)` | Verify command is blocked |
 | `assertAllowed(command, cwd?)` | Verify command passes through |
-| `withTempDir(fn)` | Run test with temporary directory |
-| `withConfig(config, fn)` | Run test with custom config |
+| `runGuard(command, cwd?, config?)` | Run analysis and return reason or null |
+| `withEnv(env, fn)` | Run test with temporary environment variables |
 
 ## Environment Variables
 
