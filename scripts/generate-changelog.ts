@@ -17,6 +17,9 @@ export const REPO =
 /** Paths that indicate Claude Code plugin changes */
 const CLAUDE_CODE_PATHS = ["commands/", "hooks/", ".claude-plugin/"];
 
+/** Paths that indicate OpenCode plugin changes */
+const OPENCODE_PATHS = [".opencode/"];
+
 /**
  * Get the files changed in a commit.
  */
@@ -38,16 +41,28 @@ function isClaudeCodeFile(path: string): boolean {
 }
 
 /**
- * Classify a commit based on its changed files.
- * Returns "core" if any non-Claude-Code file is touched (Core wins ties).
+ * Check if a file path belongs to OpenCode plugin.
  */
-function classifyCommit(files: string[]): "core" | "claude-code" {
+function isOpenCodeFile(path: string): boolean {
+	return OPENCODE_PATHS.some((prefix) => path.startsWith(prefix));
+}
+
+/**
+ * Classify a commit based on its changed files.
+ * Priority: core > claude-code > opencode (higher priority wins ties).
+ */
+function classifyCommit(files: string[]): "core" | "claude-code" | "opencode" {
 	if (files.length === 0) return "core";
 
-	const hasCore = files.some((file) => !isClaudeCodeFile(file));
+	const hasCore = files.some(
+		(file) => !isClaudeCodeFile(file) && !isOpenCodeFile(file),
+	);
 	if (hasCore) return "core";
 
-	return "claude-code";
+	const hasClaudeCode = files.some((file) => isClaudeCodeFile(file));
+	if (hasClaudeCode) return "claude-code";
+
+	return "opencode";
 }
 
 /**
@@ -75,6 +90,7 @@ export async function getLatestReleasedTag(): Promise<string | null> {
 interface CategorizedChangelog {
 	core: string[];
 	claudeCode: string[];
+	openCode: string[];
 }
 
 /**
@@ -103,6 +119,15 @@ export function formatReleaseNotes(
 		notes.push("No changes in this release");
 	}
 
+	// OpenCode section
+	notes.push("");
+	notes.push("## OpenCode");
+	if (changelog.openCode.length > 0) {
+		notes.push(...changelog.openCode);
+	} else {
+		notes.push("No changes in this release");
+	}
+
 	// Contributors section
 	if (contributors.length > 0) {
 		notes.push(...contributors);
@@ -114,7 +139,11 @@ export function formatReleaseNotes(
 export async function generateChangelog(
 	previousTag: string,
 ): Promise<CategorizedChangelog> {
-	const result: CategorizedChangelog = { core: [], claudeCode: [] };
+	const result: CategorizedChangelog = {
+		core: [],
+		claudeCode: [],
+		openCode: [],
+	};
 
 	try {
 		const log =
@@ -132,8 +161,10 @@ export async function generateChangelog(
 
 			if (category === "core") {
 				result.core.push(`- ${commit}`);
-			} else {
+			} else if (category === "claude-code") {
 				result.claudeCode.push(`- ${commit}`);
+			} else {
+				result.openCode.push(`- ${commit}`);
 			}
 		}
 	} catch {
