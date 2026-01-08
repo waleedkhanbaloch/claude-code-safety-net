@@ -1,74 +1,124 @@
 ---
-description: Set custom rules for the project
-allowed-tools: Bash, Read, Write, Glob, AskUserQuestion
+description: Set custom rules for Safety Net
+allowed-tools: Bash, Read, Write, AskUserQuestion
 ---
 
-# Set Custom Rules for Safety Net
-
 You are helping the user configure custom blocking rules for claude-code-safety-net.
-ALWAYS use AskUserQuestion tool when you need to ask the user questions.
+
+## Context
+
+### Schema Documentation
+
+!`npx -y cc-safety-net --custom-rules-doc`
 
 ## Your Task
 
 Follow this flow exactly:
 
-### Step 1: Run `npx -y cc-safety-net --custom-rules-doc` to read the full schema details, field constraints, and usage examples
+### Step 1: Ask for Scope
 
-### Step 2: Show Examples and Ask for Scope
+Use AskUserQuestion to let user select scope:
+
+```json
+{
+  "questions": [
+    {
+      "question": "Which scope would you like to configure?",
+      "header": "Configure",
+      "multiSelect": false,
+      "options": [
+        {
+          "label": "User",
+          "description": "(`~/.cc-safety-net/config.json`) - applies to all your projects"
+        },
+        {
+          "label": "Project",
+          "description": "(`.safety-net.json`) - applies only to this project"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Step 2: Show Examples and Ask for Rules
 
 Show examples in natural language:
 - "Block `git add -A` and `git add .` to prevent blanket staging"
 - "Block `npm install -g` to prevent global package installs"
 - "Block `docker system prune` to prevent accidental cleanup"
 
-Ask: **Which scope would you like to configure?**
-- **User** (`~/.cc-safety-net/config.json`) - applies to all your projects
-- **Project** (`.safety-net.json`) - applies only to this project
-
-### Step 3: Ask for Rules
-
 Ask the user to describe rules in natural language. They can list multiple.
 
-### Step 4: Generate JSON Config
+### Step 3: Generate and Show JSON Config
 
-Parse user input and generate valid schema JSON.
+Parse user input and generate valid schema JSON using the schema documentation above.
 
-### Step 5: Show Config and Confirm
+Then show the generated config JSON to the user.
 
-Display the generated JSON and ask:
-- "Does this look correct?"
-- "Would you like to modify anything?"
+### Step 4: Ask for Confirmation
 
-### Step 6: Check for Existing Config
+Use AskUserQuestion to let user choose:
 
-Check if config exists at target location:
-```bash
-cat ~/.cc-safety-net/config.json 2>/dev/null  # user scope
-cat .safety-net.json 2>/dev/null               # project scope
+```json
+{
+  "questions": [
+    {
+      "question": "Does this look correct?",
+      "header": "Confirmation",
+      "multiSelect": false,
+      "options": [
+        {
+          "label": "Yes",
+        },
+        {
+          "label": "No",
+        }
+      ]
+    }
+  ]
+}
 ```
 
-If exists:
-1. Show existing config
-2. Ask: **Merge** (add new rules, duplicates use new version) or **Replace**?
+### Step 5: Check and Handle Existing Config
 
-### Step 7: Validate and Write
+1. Check existing User Config with `cat ~/.cc-safety-net/config.json 2>/dev/null || echo "No user config found"`
+2. Check existing Project Config with `cat .safety-net.json 2>/dev/null || echo "No project config found"`
 
-For user scope, ensure directory exists:
-```bash
-mkdir -p ~/.cc-safety-net
+If the chosen scope already has a config:
+
+Show the existing config to the user.
+Use AskUserQuestion tool to let user choose:
+```json
+{
+"questions": [
+    {
+    "question": "The chosen scope already has a config. What would you like to do?",
+    "header": "Configure",
+    "multiSelect": false,
+    "options": [
+        {
+        "label": "Merge",
+        },
+        {
+        "label": "Replace",
+        }
+    ]
+    }
+]
+}
 ```
 
-Write config, then validate:
-```bash
-npx -y cc-safety-net --verify-config
-```
+### Step 6: Write and Validate
+
+Write the config to the chosen scope, then validate with `npx -y cc-safety-net --verify-config`.
 
 If validation errors:
 - Show specific errors
 - Offer to fix with your best suggestion
 - Confirm before proceeding
 
-### Step 8: Confirm Success
+### Step 7: Confirm Success
 
 Tell the user:
 1. Config saved to [path]
