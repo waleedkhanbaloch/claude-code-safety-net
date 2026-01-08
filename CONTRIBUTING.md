@@ -53,9 +53,9 @@ bun run check
 
 ## Claude Code
 
-1. **Build and link the project**:
+1. **Build the project**:
    ```bash
-   bun run build && bun link
+   bun run build
    ```
 
 2. **Disable the safety-net plugin** in Claude Code (if installed) and exit Claude Code completely.
@@ -74,19 +74,14 @@ bun run check
    git checkout -b test-branch
    ```
 
-5. **Unlink the project** when you're done:
-   ```bash
-   bun unlink
-   ```
-
 > [!NOTE]
 > See the [official documentation](https://docs.anthropic.com/en/docs/claude-code/plugins#test-your-plugins-locally) for more details on testing plugins locally.
 
 ## OpenCode
 
-1. **Build and link the project**:
+1. **Build the project**:
    ```bash
-   bun run build && bun link
+   bun run build
    ```
 
 2. **Update your OpenCode config** (`~/.config/opencode/opencode.json` or `opencode.jsonc`):
@@ -109,6 +104,7 @@ bun run check
 
 > [!NOTE]
 > Remove `"cc-safety-net"` from the plugin array if it exists, to avoid conflicts with the npm version.
+> Or comment out the line if you're using `opencode.jsonc`.
 
 3. **Restart OpenCode** to load the changes.
 
@@ -121,13 +117,6 @@ bun run check
 
    # This should be allowed
    git checkout -b test-branch
-   ```
-
-6. **Manually copy or add commands** to `~/.config/opencode/command` or `.opencode/command` if you modified or added any new commands. 
-
-7. **Unlink the project** when you're done:
-   ```bash
-   bun unlink
    ```
 
 > [!NOTE]
