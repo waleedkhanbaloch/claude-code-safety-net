@@ -7,7 +7,7 @@ import { formatBlockedMessage } from "../core/format.ts";
 import { verifyConfig } from "../core/verify-config.ts";
 import type { HookInput, HookOutput } from "../types.ts";
 
-const VERSION = "0.4.0";
+const VERSION = "0.4.1";
 
 function printHelp(): void {
 	console.log(`cc-safety-net v${VERSION}
