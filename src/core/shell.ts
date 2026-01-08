@@ -32,34 +32,40 @@ export function splitShellCommands(command: string): string[][] {
 				current = [];
 			}
 			i++;
-		} else if (typeof token === "string") {
-			const nextToken = tokens[i + 1];
-			if (token === "$" && nextToken && isParenOpen(nextToken)) {
-				if (current.length > 0) {
-					segments.push(current);
-					current = [];
-				}
-				const { innerSegments, endIndex } = extractCommandSubstitution(
-					tokens,
-					i + 2,
-				);
-				for (const seg of innerSegments) {
-					segments.push(seg);
-				}
-				i = endIndex + 1;
-			} else {
-				const backtickSegments = extractBacktickSubstitutions(token);
-				if (backtickSegments.length > 0) {
-					for (const seg of backtickSegments) {
-						segments.push(seg);
-					}
-				}
-				current.push(token);
-				i++;
-			}
-		} else {
-			i++;
+			continue;
 		}
+
+		if (typeof token !== "string") {
+			i++;
+			continue;
+		}
+
+		// Handle string tokens
+		const nextToken = tokens[i + 1];
+		if (token === "$" && nextToken && isParenOpen(nextToken)) {
+			if (current.length > 0) {
+				segments.push(current);
+				current = [];
+			}
+			const { innerSegments, endIndex } = extractCommandSubstitution(
+				tokens,
+				i + 2,
+			);
+			for (const seg of innerSegments) {
+				segments.push(seg);
+			}
+			i = endIndex + 1;
+			continue;
+		}
+
+		const backtickSegments = extractBacktickSubstitutions(token);
+		if (backtickSegments.length > 0) {
+			for (const seg of backtickSegments) {
+				segments.push(seg);
+			}
+		}
+		current.push(token);
+		i++;
 	}
 
 	if (current.length > 0) {
@@ -125,15 +131,27 @@ function extractCommandSubstitution(
 
 		if (isParenOpen(token)) {
 			depth++;
-		} else if (isParenClose(token)) {
+			i++;
+			continue;
+		}
+
+		if (isParenClose(token)) {
 			depth--;
 			if (depth === 0) break;
-		} else if (depth === 1 && token && isOperator(token)) {
+			i++;
+			continue;
+		}
+
+		if (depth === 1 && token && isOperator(token)) {
 			if (currentSegment.length > 0) {
 				innerSegments.push(currentSegment);
 				currentSegment = [];
 			}
-		} else if (typeof token === "string") {
+			i++;
+			continue;
+		}
+
+		if (typeof token === "string") {
 			currentSegment.push(token);
 		}
 		i++;
@@ -250,18 +268,23 @@ export function stripWrappersWithInfo(
 
 		const head = result[0]?.toLowerCase();
 
+		// Guard: unknown wrapper type, exit loop
+		if (head !== "sudo" && head !== "env" && head !== "command") {
+			break;
+		}
+
 		if (head === "sudo") {
 			result = stripSudo(result);
-		} else if (head === "env") {
+		}
+		if (head === "env") {
 			const envResult = stripEnvWithInfo(result);
 			result = envResult.tokens;
 			for (const [k, v] of envResult.envAssignments) {
 				allEnvAssignments.set(k, v);
 			}
-		} else if (head === "command") {
+		}
+		if (head === "command") {
 			result = stripCommand(result);
-		} else {
-			break;
 		}
 
 		if (result.join(" ") === before) break;
@@ -298,15 +321,18 @@ function stripSudo(tokens: string[]): string[] {
 		if (token === "--") {
 			return tokens.slice(i + 1);
 		}
-		if (token.startsWith("-")) {
-			if (SUDO_OPTS_WITH_VALUE.has(token)) {
-				i += 2;
-			} else {
-				i++;
-			}
-		} else {
+
+		// Guard: not an option, exit loop
+		if (!token.startsWith("-")) {
 			break;
 		}
+
+		if (SUDO_OPTS_WITH_VALUE.has(token)) {
+			i += 2;
+			continue;
+		}
+
+		i++;
 	}
 	return tokens.slice(i);
 }
@@ -332,27 +358,44 @@ function stripEnvWithInfo(tokens: string[]): EnvStrippingResult {
 		if (token === "--") {
 			return { tokens: tokens.slice(i + 1), envAssignments };
 		}
+
 		if (ENV_OPTS_NO_VALUE.has(token)) {
 			i++;
-		} else if (ENV_OPTS_WITH_VALUE.has(token)) {
-			i += 2;
-		} else if (token.startsWith("-u=") || token.startsWith("--unset=")) {
-			i++;
-		} else if (token.startsWith("-C=") || token.startsWith("--chdir=")) {
-			i++;
-		} else if (token.startsWith("-P")) {
-			i++;
-		} else if (token.startsWith("-")) {
-			i++;
-		} else {
-			const assignment = parseEnvAssignment(token);
-			if (assignment) {
-				envAssignments.set(assignment.name, assignment.value);
-				i++;
-			} else {
-				break;
-			}
+			continue;
 		}
+
+		if (ENV_OPTS_WITH_VALUE.has(token)) {
+			i += 2;
+			continue;
+		}
+
+		if (token.startsWith("-u=") || token.startsWith("--unset=")) {
+			i++;
+			continue;
+		}
+
+		if (token.startsWith("-C=") || token.startsWith("--chdir=")) {
+			i++;
+			continue;
+		}
+
+		if (token.startsWith("-P")) {
+			i++;
+			continue;
+		}
+
+		if (token.startsWith("-")) {
+			i++;
+			continue;
+		}
+
+		// Not an option - try to parse as env assignment
+		const assignment = parseEnvAssignment(token);
+		if (!assignment) {
+			break;
+		}
+		envAssignments.set(assignment.name, assignment.value);
+		i++;
 	}
 	return { tokens: tokens.slice(i), envAssignments };
 }
@@ -365,22 +408,24 @@ function stripCommand(tokens: string[]): string[] {
 
 		if (token === "-p" || token === "-v" || token === "-V") {
 			i++;
-		} else if (
-			token.startsWith("-") &&
-			!token.startsWith("--") &&
-			token.length > 1
-		) {
+			continue;
+		}
+
+		if (token === "--") {
+			return tokens.slice(i + 1);
+		}
+
+		// Check for combined short opts like -pv
+		if (token.startsWith("-") && !token.startsWith("--") && token.length > 1) {
 			const chars = token.slice(1);
-			if (/^[pvV]+$/.test(chars)) {
-				i++;
-			} else {
+			if (!/^[pvV]+$/.test(chars)) {
 				break;
 			}
-		} else if (token === "--") {
-			return tokens.slice(i + 1);
-		} else {
-			break;
+			i++;
+			continue;
 		}
+
+		break;
 	}
 	return tokens.slice(i);
 }
@@ -399,11 +444,10 @@ export function extractShortOpts(tokens: string[]): Set<string> {
 		if (token.startsWith("-") && !token.startsWith("--") && token.length > 1) {
 			for (let i = 1; i < token.length; i++) {
 				const char = token[i];
-				if (char && /[a-zA-Z]/.test(char)) {
-					opts.add(`-${char}`);
-				} else {
+				if (!char || !/[a-zA-Z]/.test(char)) {
 					break;
 				}
+				opts.add(`-${char}`);
 			}
 		}
 	}
@@ -420,8 +464,10 @@ export function getBasename(token: string): string {
 }
 
 function isOperator(token: ParseEntry): boolean {
-	if (typeof token === "object" && token !== null && "op" in token) {
-		return SHELL_OPERATORS.has(token.op as string);
-	}
-	return false;
+	return (
+		typeof token === "object" &&
+		token !== null &&
+		"op" in token &&
+		SHELL_OPERATORS.has(token.op as string)
+	);
 }
