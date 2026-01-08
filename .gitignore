@@ -1,7 +1,6 @@
 # --- Project Specific ---
 .cursor/
 .claude/
-.opencode/
 log*
 plan-*.md
 *-plan-*.md
