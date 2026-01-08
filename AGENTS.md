@@ -23,6 +23,10 @@ A Claude Code / OpenCode plugin that blocks destructive git and filesystem comma
 
 Runs on commit (in order): knip → lint-staged (biome check --write)
 
+## Commit Conventions
+
+When committing changes to files in `commands/`, `hooks/`, or `.opencode/`, use only `fix` or `feat` commit types. These directories contain user-facing skill definitions and hook configurations that represent features or fixes to the plugin's capabilities.
+
 ## Code Style (TypeScript)
 
 ### Formatting

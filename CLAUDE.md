@@ -60,6 +60,10 @@ The hook receives JSON input on stdin containing `tool_name` and `tool_input`. F
 - Use `type | null` syntax (not `undefined` where possible)
 - Use kebab-case for file names (`rules-git.ts`, not `rulesGit.ts`)
 
+## Commit Conventions
+
+When committing changes to files in `commands/`, `hooks/`, or `.opencode/`, use only `fix` or `feat` commit types. These directories contain user-facing skill definitions and hook configurations that represent features or fixes to the plugin's capabilities.
+
 ## Environment Variables
 
 - `SAFETY_NET_STRICT=1`: Strict mode (fail-closed on unparseable hook input/commands)
