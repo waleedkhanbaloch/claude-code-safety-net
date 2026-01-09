@@ -39,7 +39,7 @@ jobs:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli"
 
       - name: Run tests
-        run: AGENT=1 bun test
+        run: AGENT=1 bun test --coverage
 
   typecheck:
     runs-on: ubuntu-latest

@@ -16,7 +16,7 @@
 		"build:types": "tsc --emitDeclarationOnly --declaration --noEmit false",
 		"build:schema": "bun run scripts/build-schema.ts",
 		"clean": "rm -rf dist",
-		"check": "bun run lint && bun run typecheck && bun run knip && bun run sg:scan && AGENT=1 bun test",
+		"check": "bun run lint && bun run typecheck && bun run knip && bun run sg:scan && AGENT=1 bun test --coverage",
 		"lint": "biome check --write",
 		"typecheck": "tsc --project tsconfig.typecheck.json",
 		"knip": "knip --production",
