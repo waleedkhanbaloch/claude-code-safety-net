@@ -64,6 +64,30 @@ export interface HookOutput {
 	};
 }
 
+/** Gemini CLI hook input format */
+export interface GeminiHookInput {
+	session_id?: string;
+	transcript_path?: string;
+	cwd?: string;
+	hook_event_name: string;
+	timestamp?: string;
+	tool_name?: string;
+	tool_input?: {
+		command?: string;
+		[key: string]: unknown;
+	};
+}
+
+/** Gemini CLI hook output format */
+export interface GeminiHookOutput {
+	decision: "deny";
+	reason: string;
+	systemMessage: string;
+	continue?: boolean;
+	stopReason?: string;
+	suppressOutput?: boolean;
+}
+
 /** Options for command analysis */
 export interface AnalyzeOptions {
 	/** Current working directory */

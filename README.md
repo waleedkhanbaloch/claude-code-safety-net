@@ -4,8 +4,15 @@
 [![codecov](https://codecov.io/github/kenryu42/claude-code-safety-net/branch/main/graph/badge.svg?token=C9QTION6ZF)](https://codecov.io/github/kenryu42/claude-code-safety-net)
 [![Version](https://img.shields.io/github/v/tag/kenryu42/claude-code-safety-net?label=version&color=blue)](https://github.com/kenryu42/claude-code-safety-net)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-Plugin-orange)](https://platform.claude.com/docs/en/agent-sdk/plugins)
-[![Claude Code](https://img.shields.io/badge/OpenCode-Plugin-black)](https://opencode.ai/docs/plugins/)
+[![OpenCode](https://img.shields.io/badge/OpenCode-Plugin-black)](https://opencode.ai/docs/plugins/)
+[![Gemini CLI](https://img.shields.io/badge/Gemini-CLI-lightblue)](https://github.com/kenryu42/gemini-safety-net)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+<div align="center">
+
+[![CC Safety Net](./.github/assets/cc-safety-net.png)](https://github.com/kenryu42/claude-code-safety-net)
+
+</div>
 
 A Claude Code plugin that acts as a safety net, catching destructive git and filesystem commands before they execute.
 
@@ -18,6 +25,7 @@ A Claude Code plugin that acts as a safety net, catching destructive git and fil
 - [Quick Start](#quick-start)
   - [Claude Code Installation](#claude-code-installation)
   - [OpenCode Installation](#opencode-installation)
+  - [Gemini CLI Installation](#gemini-cli-installation)
 - [Commands Blocked](#commands-blocked)
 - [Commands Allowed](#commands-allowed)
 - [What Happens When Blocked](#what-happens-when-blocked)
@@ -184,6 +192,24 @@ Then copy the following files to `~/.config/opencode/command/`:
   ```
 
 2. **Copy the [commands](.opencode/command) to `~/.config/opencode/command/`**
+
+---
+
+### Gemini CLI Installation
+
+```bash
+gemini extensions install https://github.com/kenryu42/gemini-safety-net
+```
+
+> [!IMPORTANT]
+> You need to set the following settings in `.gemini/settings.json` to enable hooks:
+> ```json
+> {
+>   "tools": {
+>     "enableHooks": true
+>   }
+> }
+> ```
 
 ## Commands Blocked
 
