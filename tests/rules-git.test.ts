@@ -232,6 +232,10 @@ describe("git reset", () => {
 		assertBlocked("git -- reset --hard", "reset --hard");
 	});
 
+	test("git -cfoo=bar reset --hard blocked", () => {
+		assertBlocked("git -cfoo=bar reset --hard", "git reset --hard");
+	});
+
 	test("sudo env VAR=1 git reset --hard blocked", () => {
 		assertBlocked("sudo env VAR=1 git reset --hard", "git reset --hard");
 	});

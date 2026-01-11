@@ -688,4 +688,101 @@ describe("edge cases", () => {
 			assertBlocked("git reset --hard", "git reset --hard", "");
 		});
 	});
+
+	describe("display-only commands bypass fallback scanning", () => {
+		test("echo with git reset --hard allowed", () => {
+			assertAllowed("echo git reset --hard");
+		});
+
+		test("echo with rm -rf allowed", () => {
+			assertAllowed("echo rm -rf /");
+		});
+
+		test("printf with git reset --hard allowed", () => {
+			assertAllowed("printf 'git reset --hard'");
+		});
+
+		test("printf with rm -rf allowed", () => {
+			assertAllowed("printf 'rm -rf /'");
+		});
+
+		test("cat with find -delete allowed", () => {
+			assertAllowed("cat find -delete");
+		});
+
+		test("grep with git checkout -- file allowed", () => {
+			assertAllowed("grep 'git checkout -- file' log.txt");
+		});
+
+		test("rg with rm -rf allowed", () => {
+			assertAllowed("rg 'rm -rf' .");
+		});
+
+		test("sed with git reset --hard allowed", () => {
+			assertAllowed("sed 's/git reset --hard/safe/' file.txt");
+		});
+
+		test("awk with rm -rf allowed", () => {
+			assertAllowed("awk '/rm -rf/ {print}' log.txt");
+		});
+
+		test("head with git clean -f allowed", () => {
+			assertAllowed("head git clean -f");
+		});
+
+		test("tail with git stash drop allowed", () => {
+			assertAllowed("tail git stash drop");
+		});
+
+		test("wc with rm -rf allowed", () => {
+			assertAllowed("wc rm -rf /");
+		});
+
+		test("less with git push --force allowed", () => {
+			assertAllowed("less git push --force");
+		});
+	});
+
+	describe("recursion depth boundary", () => {
+		test("shell dash c recursion at exactly MAX_RECURSION_DEPTH (5) returns null", () => {
+			let cmd = "rm -rf /some/path";
+			for (let i = 0; i < 5; i++) {
+				cmd = `bash -c ${JSON.stringify(cmd)}`;
+			}
+			const result = runGuard(cmd);
+			expect(result).toBeNull();
+		});
+
+		test("shell dash c recursion at depth 4 still blocks", () => {
+			let cmd = "rm -rf /some/path";
+			for (let i = 0; i < 4; i++) {
+				cmd = `bash -c ${JSON.stringify(cmd)}`;
+			}
+			const result = runGuard(cmd);
+			expect(result).not.toBeNull();
+			expect(result).toContain("rm -rf");
+		});
+	});
+
+	describe("parallel rm placeholder expansion with mixed args", () => {
+		test("parallel rm -rf with one safe and one dangerous arg blocked", () => {
+			assertBlocked("parallel rm -rf {} ::: build /", "rm -rf", tempDir);
+		});
+
+		test("parallel rm -rf with multiple dangerous args blocked", () => {
+			assertBlocked("parallel rm -rf {} ::: / ~", "rm -rf", tempDir);
+		});
+
+		test("parallel rm -rf with all safe args allowed", () => {
+			assertAllowed("parallel rm -rf {} ::: build dist node_modules", tempDir);
+		});
+
+		test("parallel bash -c rm -rf with mixed args blocked", () => {
+			assertBlocked(
+				"parallel bash -c 'rm -rf {}' ::: build /",
+				"rm -rf",
+				tempDir,
+			);
+		});
+	});
 });

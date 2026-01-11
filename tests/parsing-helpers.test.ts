@@ -6,6 +6,8 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { dangerousInText } from "../src/core/analyze/dangerous-text.ts";
+import { extractDashCArg } from "../src/core/analyze/shell-wrappers.ts";
 import {
 	_extractParallelChildCommand,
 	_extractXargsChildCommand,
@@ -24,6 +26,52 @@ import {
 import { MAX_STRIP_ITERATIONS } from "../src/types.ts";
 
 describe("shell parsing helpers", () => {
+	describe("extractDashCArg", () => {
+		test("returns null for empty tokens", () => {
+			expect(extractDashCArg([])).toBeNull();
+		});
+
+		test("returns null for single token", () => {
+			expect(extractDashCArg(["bash"])).toBeNull();
+		});
+
+		test("extracts arg after standalone -c", () => {
+			expect(extractDashCArg(["bash", "-c", "echo ok"])).toBe("echo ok");
+		});
+
+		test("extracts arg after bundled -lc", () => {
+			expect(extractDashCArg(["bash", "-lc", "echo ok"])).toBe("echo ok");
+		});
+
+		test("extracts arg after bundled -xc", () => {
+			expect(extractDashCArg(["sh", "-xc", "rm -rf /"])).toBe("rm -rf /");
+		});
+
+		test("returns null when -c has no following arg", () => {
+			expect(extractDashCArg(["bash", "-c"])).toBeNull();
+		});
+
+		test("returns null when bundled option has no following arg", () => {
+			expect(extractDashCArg(["bash", "-lc"])).toBeNull();
+		});
+
+		test("handles -- separator before -c (implementation scans past it)", () => {
+			expect(extractDashCArg(["bash", "--", "-c", "echo"])).toBe("echo");
+		});
+
+		test("ignores long options starting with --", () => {
+			expect(extractDashCArg(["bash", "--rcfile", "script"])).toBeNull();
+		});
+
+		test("returns null when next token starts with dash", () => {
+			expect(extractDashCArg(["bash", "-lc", "-x"])).toBeNull();
+		});
+
+		test("handles -c appearing later in tokens", () => {
+			expect(extractDashCArg(["bash", "-l", "-c", "echo ok"])).toBe("echo ok");
+		});
+	});
+
 	describe("extractShortOpts", () => {
 		test("stops at double dash", () => {
 			// given: tokens with -Ap after -- (a filename, not options)
@@ -76,6 +124,42 @@ describe("shell parsing helpers", () => {
 				["a"],
 				["b"],
 				["echo", "`a`:`b`"],
+			]);
+		});
+
+		test("handles nested $(...) with operators", () => {
+			const result = splitShellCommands("echo $(echo $(rm -rf /tmp/x))");
+			expect(result.length).toBeGreaterThan(1);
+			const flat = result.flat();
+			expect(flat).toContain("rm");
+			expect(flat).toContain("-rf");
+		});
+
+		test("handles deeply nested $(...) substitutions", () => {
+			const result = splitShellCommands("echo $(a $(b $(c)))");
+			expect(result.length).toBeGreaterThan(1);
+		});
+
+		test("handles $(...) with semicolon operators", () => {
+			expect(splitShellCommands("echo $(cd /tmp; rm -rf .)")).toEqual([
+				["echo"],
+				["cd", "/tmp"],
+				["rm", "-rf", "."],
+			]);
+		});
+
+		test("handles $(...) with pipe operators", () => {
+			expect(splitShellCommands("echo $(cat file | rm -rf /)")).toEqual([
+				["echo"],
+				["cat", "file"],
+				["rm", "-rf", "/"],
+			]);
+		});
+
+		test("handles unterminated $() substitution (no hang, still extracts tokens)", () => {
+			expect(splitShellCommands("echo $(rm -rf /tmp/x")).toEqual([
+				["echo"],
+				["rm", "-rf", "/tmp/x"],
 			]);
 		});
 	});
@@ -192,6 +276,57 @@ describe("find parsing helpers", () => {
 				false,
 			);
 		});
+
+		test("options that consume a value treat -delete as an argument", () => {
+			const consumingValue = [
+				"-name",
+				"-iname",
+				"-path",
+				"-ipath",
+				"-regex",
+				"-iregex",
+				"-type",
+				"-user",
+				"-group",
+				"-perm",
+				"-size",
+				"-mtime",
+				"-ctime",
+				"-atime",
+				"-newer",
+				"-printf",
+				"-fprint",
+				"-fprintf",
+			] as const;
+
+			for (const opt of consumingValue) {
+				expect(_findHasDelete([opt, "-delete"])).toBe(false);
+				expect(_findHasDelete([opt, "-delete", "-delete"])).toBe(true);
+			}
+		});
+	});
+});
+
+describe("dangerousInText", () => {
+	test("detects rm -rf variants", () => {
+		expect(dangerousInText("rm -rf /tmp/x")).toBe("rm -rf");
+		expect(dangerousInText("rm -R -f /tmp/x")).toBe("rm -rf");
+		expect(dangerousInText("rm -fr /tmp/x")).toBe("rm -rf");
+		expect(dangerousInText("rm -f -r /tmp/x")).toBe("rm -rf");
+	});
+
+	test("detects with leading whitespace (trimStart)", () => {
+		expect(dangerousInText("   rm -rf /tmp/x")).toBe("rm -rf");
+	});
+
+	test("detects key git patterns", () => {
+		expect(dangerousInText("git reset --hard")).toBe("git reset --hard");
+		expect(dangerousInText("git clean -f")).toBe("git clean -f");
+	});
+
+	test("skips find -delete when text starts with echo/rg", () => {
+		expect(dangerousInText('echo "find . -delete')).toBeNull();
+		expect(dangerousInText('rg "find . -delete')).toBeNull();
 	});
 });
 
@@ -360,6 +495,34 @@ describe("git rules helpers", () => {
 			]);
 			expect(result.subcommand).toBe("reset");
 			expect(result.rest).toEqual([]);
+		});
+
+		test("double dash can introduce subcommand", () => {
+			const result = _extractGitSubcommandAndRest([
+				"git",
+				"--",
+				"reset",
+				"--hard",
+			]);
+			expect(result.subcommand).toBe("reset");
+			expect(result.rest).toEqual(["--hard"]);
+		});
+
+		test("double dash without a subcommand yields null", () => {
+			const result = _extractGitSubcommandAndRest(["git", "--", "--help"]);
+			expect(result.subcommand).toBeNull();
+			expect(result.rest).toEqual(["--help"]);
+		});
+
+		test("attached -C consumes itself", () => {
+			const result = _extractGitSubcommandAndRest([
+				"git",
+				"-C/tmp",
+				"reset",
+				"--hard",
+			]);
+			expect(result.subcommand).toBe("reset");
+			expect(result.rest).toEqual(["--hard"]);
 		});
 	});
 
