@@ -6,7 +6,7 @@
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-D27656)](https://platform.claude.com/docs/en/agent-sdk/plugins)
 [![OpenCode](https://img.shields.io/badge/OpenCode-black)](https://opencode.ai/docs/plugins/)
 [![Gemini CLI](https://img.shields.io/badge/Gemini%20CLI-678AE3)](https://github.com/kenryu42/gemini-safety-net)
-[![License: MIT](https://img.shields.io/badge/License-MIT-red.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-redkkkj.svg)](https://opensource.org/licenses/MIT)
 
 <div align="center">
 
@@ -175,10 +175,6 @@ Paste this into any LLM agent (Claude Code, OpenCode, Cursor, etc.):
 
 ```
 Install the cc-safety-net plugin in `~/.config/opencode/opencode.json` (or `.jsonc`) according to the schema at: https://opencode.ai/config.json
-
-Then copy the following files to `~/.config/opencode/command/`:
-- https://raw.githubusercontent.com/kenryu42/claude-code-safety-net/main/.opencode/command/set-custom-rules.md
-- https://raw.githubusercontent.com/kenryu42/claude-code-safety-net/main/.opencode/command/verify-custom-rules.md
 ```
 
 **Option B: Manual setup**
@@ -190,8 +186,6 @@ Then copy the following files to `~/.config/opencode/command/`:
     "plugin": ["cc-safety-net"]
   }
   ```
-
-2. **Copy the [commands](.opencode/command) to `~/.config/opencode/command/`**
 
 ---
 
