@@ -6,7 +6,7 @@
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-D27656)](https://platform.claude.com/docs/en/agent-sdk/plugins)
 [![OpenCode](https://img.shields.io/badge/OpenCode-black)](https://opencode.ai/docs/plugins/)
 [![Gemini CLI](https://img.shields.io/badge/Gemini%20CLI-678AE3)](https://github.com/kenryu42/gemini-safety-net)
-[![License: MIT](https://img.shields.io/badge/License-MIT-redkkkj.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-red.svg)](https://opensource.org/licenses/MIT)
 
 <div align="center">
 
